@@ -8,6 +8,8 @@ A lightweight desktop GUI for monitoring and debugging MQTT brokers, built with 
 [![MQTT](https://img.shields.io/badge/MQTT-3.1.1%2F5.0-purple)](https://mqtt.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
+![MQTT Monitor screenshot](assets/main_page.png)
+
 ## Features
 
 - Connect to any MQTT broker with optional TLS, username/password, and custom client ID
