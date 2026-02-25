@@ -1,0 +1,5 @@
+# MQTT Monitor log — session started 2026-02-24T23:19:21.943917
+# Columns: timestamp | QoS | Retain | topic | payload
+
+
+# Session ended 2026-02-24T23:19:23.199314
