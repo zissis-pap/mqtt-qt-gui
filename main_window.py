@@ -4,6 +4,7 @@ Main Window — MQTT Monitor GUI.
 from __future__ import annotations
 
 import csv
+import importlib.metadata
 import json
 import os
 from pathlib import Path
@@ -53,6 +54,7 @@ from PyQt6.QtWidgets import (
 from models import MessageTableModel
 from mqtt_client import MqttClient, MqttMessage
 from storage import FileLogger
+from version import APP_NAME, AUTHOR, DESCRIPTION, LICENSE, __version__
 
 _SETTINGS_HOST = "connection/host"
 _SETTINGS_PORT = "connection/port"
@@ -74,6 +76,12 @@ class MainWindow(QMainWindow):
         self._logger: FileLogger | None = None
         self._log_dir = "logs"
         self._log_filename = ""   # empty → auto-generate
+
+        # Debounce publisher-panel refreshes (avoids per-message redraws).
+        self._pub_refresh_timer = QTimer(self)
+        self._pub_refresh_timer.setSingleShot(True)
+        self._pub_refresh_timer.setInterval(200)
+        self._pub_refresh_timer.timeout.connect(self._rebuild_publishers_list)
 
         self._build_menu()
         self._build_ui()
@@ -108,6 +116,16 @@ class MainWindow(QMainWindow):
         act_quit.triggered.connect(self.close)
         file_menu.addAction(act_quit)
 
+        about_menu = menu_bar.addMenu("&About")
+
+        act_about = QAction(f"&About {APP_NAME}…", self)
+        act_about.triggered.connect(self._show_about)
+        about_menu.addAction(act_about)
+
+    @pyqtSlot()
+    def _show_about(self) -> None:
+        AboutDialog(self).exec()
+
     def _build_ui(self) -> None:
         central = QWidget()
         self.setCentralWidget(central)
@@ -129,6 +147,7 @@ class MainWindow(QMainWindow):
 
         left_layout.addWidget(self._build_connection_group())
         left_layout.addWidget(self._build_subscriptions_group())
+        left_layout.addWidget(self._build_publishers_group())
         left_layout.addStretch()
 
         splitter.addWidget(left_panel)
@@ -239,6 +258,25 @@ class MainWindow(QMainWindow):
         self.btn_unsubscribe = QPushButton("Unsubscribe")
         self.btn_unsubscribe.clicked.connect(self._unsubscribe)
         layout.addWidget(self.btn_unsubscribe)
+
+        return grp
+
+    def _build_publishers_group(self) -> QGroupBox:
+        grp = QGroupBox("Publishers")
+        layout = QVBoxLayout(grp)
+        layout.setSpacing(4)
+
+        self.lst_publishers = QListWidget()
+        self.lst_publishers.setMinimumHeight(80)
+        self.lst_publishers.setMaximumHeight(180)
+        self.lst_publishers.setToolTip("Click a publisher to filter messages by topic")
+        self.lst_publishers.itemClicked.connect(self._on_publisher_clicked)
+        layout.addWidget(self.lst_publishers)
+
+        btn_show_all = QPushButton("Show All")
+        btn_show_all.setToolTip("Clear publisher filter")
+        btn_show_all.clicked.connect(self._clear_publisher_filter)
+        layout.addWidget(btn_show_all)
 
         return grp
 
@@ -386,6 +424,7 @@ class MainWindow(QMainWindow):
         self._client.disconnected.connect(self._on_disconnected)
         self._client.error_occurred.connect(self._on_error)
         self._client.message_received.connect(self._on_message_received)
+        self._model.publishers_changed.connect(self._schedule_publishers_refresh)
 
         # Keyboard shortcuts
         QShortcut(QKeySequence("Ctrl+L"), self).activated.connect(self._clear_messages)
@@ -529,6 +568,49 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str)
     def _apply_filter(self, text: str) -> None:
         self._model.set_filter(text)
+
+    # ------------------------------------------------------------------
+    # Publishers panel
+    # ------------------------------------------------------------------
+
+    def _schedule_publishers_refresh(self) -> None:
+        """Debounce publisher list rebuilds to at most ~5 fps."""
+        self._pub_refresh_timer.start()
+
+    def _rebuild_publishers_list(self) -> None:
+        counts = self._model.publisher_counts
+        active = self._model.active_publisher_filter
+
+        # Preserve selection across rebuild.
+        sel_items = self.lst_publishers.selectedItems()
+        sel_topic = sel_items[0].data(Qt.ItemDataRole.UserRole) if sel_items else None
+
+        self.lst_publishers.blockSignals(True)
+        self.lst_publishers.clear()
+
+        for topic in sorted(counts):
+            count = counts[topic]
+            label = f"● {topic}  ({count})"
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, topic)
+            colour = self._model.topic_colour(topic)
+            if colour:
+                item.setForeground(QColor(colour))
+            self.lst_publishers.addItem(item)
+            if topic == (active or sel_topic):
+                item.setSelected(True)
+
+        self.lst_publishers.blockSignals(False)
+
+    def _on_publisher_clicked(self, item: QListWidgetItem) -> None:
+        topic = item.data(Qt.ItemDataRole.UserRole)
+        self._model.set_publisher_filter(topic)
+        if self.chk_autoscroll.isChecked():
+            self.table.scrollToBottom()
+
+    def _clear_publisher_filter(self) -> None:
+        self.lst_publishers.clearSelection()
+        self._model.set_publisher_filter(None)
 
     # ------------------------------------------------------------------
     # Row selection — detail panel
@@ -808,6 +890,129 @@ class LogSettingsDialog(QDialog):
         self.result_dir = self._le_dir.text().strip() or "logs"
         self.result_filename = self._le_filename.text().strip()
         super().accept()
+
+
+# ---------------------------------------------------------------------------
+# About dialog
+# ---------------------------------------------------------------------------
+
+def _pkg_version(name: str) -> str:
+    """Return the installed version of *name*, or 'unknown'."""
+    try:
+        return importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
+
+
+class AboutDialog(QDialog):
+    """Displays app version, author, licence and runtime package versions."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(f"About {APP_NAME}")
+        self.setMinimumWidth(400)
+        self.setMaximumWidth(480)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(0)
+        layout.setContentsMargins(24, 24, 24, 20)
+
+        # ── App name + version ────────────────────────────────────────────
+        lbl_name = QLabel(APP_NAME)
+        lbl_name.setStyleSheet(
+            "font-size: 20px; font-weight: bold; color: #7aa2f7;"
+        )
+        lbl_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(lbl_name)
+
+        lbl_ver = QLabel(f"Version {__version__}")
+        lbl_ver.setStyleSheet("font-size: 12px; color: #565f89;")
+        lbl_ver.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(lbl_ver)
+
+        lbl_desc = QLabel(DESCRIPTION)
+        lbl_desc.setWordWrap(True)
+        lbl_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_desc.setStyleSheet("color: #a9b1d6; font-size: 12px; margin-top: 6px;")
+        layout.addWidget(lbl_desc)
+
+        layout.addSpacing(16)
+        layout.addWidget(_make_h_separator())
+        layout.addSpacing(14)
+
+        # ── Author + Licence ─────────────────────────────────────────────
+        grid_widget = QWidget()
+        grid = QVBoxLayout(grid_widget)
+        grid.setSpacing(6)
+        grid.setContentsMargins(0, 0, 0, 0)
+
+        grid.addWidget(_about_row("Author", AUTHOR))
+        grid.addWidget(_about_row("Licence", LICENSE))
+
+        layout.addWidget(grid_widget)
+
+        layout.addSpacing(14)
+        layout.addWidget(_make_h_separator())
+        layout.addSpacing(14)
+
+        # ── Packages ─────────────────────────────────────────────────────
+        lbl_pkgs_title = QLabel("Dependencies")
+        lbl_pkgs_title.setStyleSheet(
+            "color: #7aa2f7; font-weight: bold; font-size: 11px;"
+        )
+        layout.addWidget(lbl_pkgs_title)
+        layout.addSpacing(6)
+
+        packages = [
+            ("PyQt6",     "PyQt6"),
+            ("paho-mqtt", "paho-mqtt"),
+        ]
+        pkgs_widget = QWidget()
+        pkgs_layout = QVBoxLayout(pkgs_widget)
+        pkgs_layout.setSpacing(4)
+        pkgs_layout.setContentsMargins(0, 0, 0, 0)
+        for display_name, pkg_name in packages:
+            pkgs_layout.addWidget(_about_row(display_name, _pkg_version(pkg_name)))
+        layout.addWidget(pkgs_widget)
+
+        layout.addSpacing(20)
+
+        # ── Close button ─────────────────────────────────────────────────
+        btn_close = QPushButton("Close")
+        btn_close.setDefault(True)
+        btn_close.clicked.connect(self.accept)
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        btn_row.addWidget(btn_close)
+        layout.addLayout(btn_row)
+
+
+def _about_row(label: str, value: str) -> QWidget:
+    """A single label: value row for the About dialog."""
+    w = QWidget()
+    row = QHBoxLayout(w)
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(8)
+
+    lbl_key = QLabel(label + ":")
+    lbl_key.setStyleSheet("color: #565f89; font-size: 12px;")
+    lbl_key.setFixedWidth(72)
+    lbl_key.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    row.addWidget(lbl_key)
+
+    lbl_val = QLabel(value)
+    lbl_val.setStyleSheet("color: #c0caf5; font-size: 12px;")
+    lbl_val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+    row.addWidget(lbl_val, stretch=1)
+
+    return w
+
+
+def _make_h_separator() -> QFrame:
+    sep = QFrame()
+    sep.setFrameShape(QFrame.Shape.HLine)
+    sep.setStyleSheet("color: #3d405b;")
+    return sep
 
 
 # ---------------------------------------------------------------------------

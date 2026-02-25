@@ -11,6 +11,7 @@ from PyQt6.QtCore import (
     QModelIndex,
     Qt,
     QVariant,
+    pyqtSignal,
 )
 from PyQt6.QtGui import QColor, QFont
 
@@ -39,8 +40,12 @@ class MessageTableModel(QAbstractTableModel):
     """
     Stores up to MAX_MESSAGES MQTT messages and exposes them via the
     QAbstractTableModel interface.  Supports a substring filter that
-    matches against topic and payload.
+    matches against topic and payload, and an optional publisher (topic)
+    filter set by clicking a publisher in the Publishers panel.
     """
+
+    # Emitted whenever the publisher set or counts change.
+    publishers_changed = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -48,10 +53,14 @@ class MessageTableModel(QAbstractTableModel):
         self._messages: list[MqttMessage] = []
         self._filtered_indices: list[int] = []   # indices into _messages
         self._filter: str = ""
+        self._publisher_filter: str | None = None  # exact topic or None
 
         # topic -> colour string
         self._topic_colours: dict[str, str] = {}
         self._colour_counter = 0
+
+        # topic -> message count (across all messages in _messages)
+        self._publisher_counts: dict[str, int] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -66,6 +75,9 @@ class MessageTableModel(QAbstractTableModel):
         self._messages.append(msg)
         self._assign_colour(msg.topic)
 
+        self._publisher_counts[msg.topic] = self._publisher_counts.get(msg.topic, 0) + 1
+        self.publishers_changed.emit()
+
         if self._matches_filter(msg):
             visible_row = len(self._filtered_indices)
             self.beginInsertRows(QModelIndex(), visible_row, visible_row)
@@ -77,7 +89,10 @@ class MessageTableModel(QAbstractTableModel):
         self.beginResetModel()
         self._messages.clear()
         self._filtered_indices.clear()
+        self._publisher_counts.clear()
+        self._publisher_filter = None
         self.endResetModel()
+        self.publishers_changed.emit()
 
     def set_filter(self, text: str) -> None:
         """Rebuild filtered view for *text* (substring, case-insensitive)."""
@@ -87,6 +102,24 @@ class MessageTableModel(QAbstractTableModel):
             i for i, m in enumerate(self._messages) if self._matches_filter(m)
         ]
         self.endResetModel()
+
+    def set_publisher_filter(self, topic: str | None) -> None:
+        """Restrict the visible rows to messages from *topic*, or show all if None."""
+        self.beginResetModel()
+        self._publisher_filter = topic
+        self._filtered_indices = [
+            i for i, m in enumerate(self._messages) if self._matches_filter(m)
+        ]
+        self.endResetModel()
+
+    @property
+    def publisher_counts(self) -> dict[str, int]:
+        """Snapshot of topic → message-count for all tracked publishers."""
+        return dict(self._publisher_counts)
+
+    @property
+    def active_publisher_filter(self) -> str | None:
+        return self._publisher_filter
 
     def message_at(self, visual_row: int) -> MqttMessage | None:
         """Return the MqttMessage shown at *visual_row* in the filtered view."""
@@ -183,6 +216,8 @@ class MessageTableModel(QAbstractTableModel):
             self._colour_counter += 1
 
     def _matches_filter(self, msg: MqttMessage) -> bool:
+        if self._publisher_filter is not None and msg.topic != self._publisher_filter:
+            return False
         if not self._filter:
             return True
         return (
@@ -192,6 +227,13 @@ class MessageTableModel(QAbstractTableModel):
 
     def _evict_oldest(self) -> None:
         """Remove the oldest message (index 0) and update filtered indices."""
+        evicted = self._messages[0]
+        remaining = self._publisher_counts.get(evicted.topic, 1) - 1
+        if remaining <= 0:
+            self._publisher_counts.pop(evicted.topic, None)
+        else:
+            self._publisher_counts[evicted.topic] = remaining
+
         # Check if the oldest message is visible.
         was_visible = 0 in self._filtered_indices
 

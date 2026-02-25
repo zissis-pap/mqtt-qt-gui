@@ -6,6 +6,7 @@ import sys
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 from main_window import MainWindow
+from version import APP_NAME, __version__
 
 STYLESHEET = """
 QWidget {
@@ -308,7 +309,8 @@ QSplitter {
 
 def main() -> None:
     app = QApplication(sys.argv)
-    app.setApplicationName("MQTT Monitor")
+    app.setApplicationName(APP_NAME)
+    app.setApplicationVersion(__version__)
     app.setOrganizationName("mqtt-qt-gui")
     app.setStyleSheet(STYLESHEET)
 
