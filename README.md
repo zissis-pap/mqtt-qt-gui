@@ -33,6 +33,18 @@ A lightweight desktop GUI for monitoring and debugging MQTT brokers, built with 
 | [paho-mqtt](https://eclipse.dev/paho/index.php?page=clients/python/index.php) | MQTT client library (paho v1 & v2 API) |
 | [MQTT protocol](https://mqtt.org/) | Lightweight publish/subscribe messaging |
 
+## Project Structure
+
+```
+mqtt-qt-gui/
+├── main.py           # Entry point, QApplication, Tokyo Night stylesheet
+├── main_window.py    # QMainWindow, all UI panels, menus, and dialogs
+├── models.py         # MessageTableModel (QAbstractTableModel), filter logic
+├── mqtt_client.py    # MqttClient (QObject) wrapping paho-mqtt, Qt signal bridge
+├── storage.py        # FileLogger for session-based message logging
+└── requirements.txt
+```
+
 ## Installation
 
 ```bash
@@ -131,15 +143,3 @@ Go to **File → Export to CSV…** (`Ctrl+E`) to save the currently visible mes
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
-
-## Project Structure
-
-```
-mqtt-qt-gui/
-├── main.py           # Entry point, QApplication, Tokyo Night stylesheet
-├── main_window.py    # QMainWindow, all UI panels, menus, and dialogs
-├── models.py         # MessageTableModel (QAbstractTableModel), filter logic
-├── mqtt_client.py    # MqttClient (QObject) wrapping paho-mqtt, Qt signal bridge
-├── storage.py        # FileLogger for session-based message logging
-└── requirements.txt
-```
