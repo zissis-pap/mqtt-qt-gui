@@ -2,10 +2,11 @@
 
 A lightweight desktop GUI for monitoring and debugging MQTT brokers, built with Python and PyQt6.
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
-![PyQt6](https://img.shields.io/badge/PyQt6-6.4%2B-41CD52?logo=qt&logoColor=white)
-![paho-mqtt](https://img.shields.io/badge/paho--mqtt-2.0%2B-660066)
-![License](https://img.shields.io/badge/License-MIT-blue)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![PyQt6](https://img.shields.io/badge/PyQt6-6.4%2B-41CD52?logo=qt&logoColor=white)](https://www.riverbankcomputing.com/software/pyqt/)
+[![paho-mqtt](https://img.shields.io/badge/paho--mqtt-2.0%2B-660066)](https://eclipse.dev/paho/index.php?page=clients/python/index.php)
+[![MQTT](https://img.shields.io/badge/MQTT-3.1.1%2F5.0-purple)](https://mqtt.org/)
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
 ## Features
 
@@ -22,11 +23,13 @@ A lightweight desktop GUI for monitoring and debugging MQTT brokers, built with 
 
 ## Technologies
 
-| Technology | Purpose | Link |
-|---|---|---|
-| [Python 3.10+](https://www.python.org/) | Runtime | python.org |
-| [PyQt6](https://pypi.org/project/PyQt6/) | GUI framework (Qt6 bindings) | riverbankcomputing.com |
-| [paho-mqtt](https://pypi.org/project/paho-mqtt/) | MQTT client library (v1 & v2 API) | eclipse.dev/paho |
+| Technology | Purpose |
+|---|---|
+| [Python 3.10+](https://www.python.org/) | Runtime |
+| [PyQt6](https://www.riverbankcomputing.com/software/pyqt/) | GUI framework (Qt6 bindings) |
+| [Qt6](https://www.qt.io/) | Underlying UI toolkit |
+| [paho-mqtt](https://eclipse.dev/paho/index.php?page=clients/python/index.php) | MQTT client library (paho v1 & v2 API) |
+| [MQTT protocol](https://mqtt.org/) | Lightweight publish/subscribe messaging |
 
 ## Installation
 
@@ -118,6 +121,14 @@ Go to **File → Export to CSV…** (`Ctrl+E`) to save the currently visible mes
 | `Ctrl+L` | Clear message table |
 | `Ctrl+E` | Export to CSV |
 | `Ctrl+Q` | Quit |
+
+## Author
+
+**Zissis Papadopoulos**
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
 
 ## Project Structure
 
