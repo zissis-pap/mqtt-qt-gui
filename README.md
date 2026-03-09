@@ -2,7 +2,6 @@
 
 A lightweight desktop GUI for monitoring and debugging MQTT brokers, built with Python and PyQt6.
 
-[![Version](https://img.shields.io/badge/Version-1.000-e0af68)](version.py)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PyQt6](https://img.shields.io/badge/PyQt6-6.4%2B-41CD52?logo=qt&logoColor=white)](https://www.riverbankcomputing.com/software/pyqt/)
 [![paho-mqtt](https://img.shields.io/badge/paho--mqtt-2.0%2B-660066)](https://eclipse.dev/paho/index.php?page=clients/python/index.php)
@@ -15,16 +14,17 @@ A lightweight desktop GUI for monitoring and debugging MQTT brokers, built with 
 
 - Connect to any MQTT broker with optional TLS, username/password, and custom client ID
 - Subscribe to multiple topics using wildcards (`#`, `+`)
-- **Publishers panel** — lists every unique topic that has sent a message, colour-coded with a live message count; click any publisher to filter the table to that topic instantly
 - Live message table with timestamp, topic, payload, QoS, and retain flag
-- Real-time filter across topic and payload (stacks with the publisher filter)
+- Real-time filter across topic and payload
 - Detail panel with automatic JSON pretty-printing
 - Publish messages with configurable QoS and retain flag
-- Session logging to timestamped text files
+- Session logging to timestamped text files with configurable path
 - Export visible messages to CSV (`Ctrl+E`)
-- **About dialog** — shows version, author, licence, and live dependency versions
+- Publishers panel with message counts and topic filtering
 - Tokyo Night dark theme
 - Window layout and connection settings persisted across sessions
+- Context menu on table rows (copy topic/payload/full row, publish to topic)
+- About dialog with version and dependency information
 
 ## Technologies
 
@@ -45,7 +45,6 @@ mqtt-qt-gui/
 ├── models.py         # MessageTableModel (QAbstractTableModel), filter logic
 ├── mqtt_client.py    # MqttClient (QObject) wrapping paho-mqtt, Qt signal bridge
 ├── storage.py        # FileLogger for session-based message logging
-├── version.py        # App version, author, and licence metadata
 └── requirements.txt
 ```
 
@@ -109,20 +108,9 @@ Click any row to see the **full payload** in the detail panel below the table. J
 - Copy Full Row
 - Publish to this Topic (pre-fills the publish form)
 
-### Publishers panel
-
-The **Publishers** group in the left panel automatically tracks every unique topic that has delivered at least one message. Each entry is colour-coded to match its topic in the message table and shows a live message count.
-
-- **Click a publisher** to restrict the message table to that topic only.
-- **Show All** clears the publisher filter and restores the full view.
-- The publisher filter and the text filter bar work independently and stack together.
-- Counts are kept accurate as old messages are evicted once the 2 000-message limit is reached.
-
 ### Filtering messages
 
 Type in the **Filter** bar above the table to narrow results by topic or payload content. The status bar shows `visible/total` counts when a filter is active. Click the **×** button or clear the field to remove the filter.
-
-A publisher-panel selection and the text filter can both be active at the same time — only messages that satisfy both are shown.
 
 ### Publishing messages
 
@@ -142,6 +130,10 @@ A publisher-panel selection and the text filter can both be active at the same t
 
 Go to **File → Export to CSV…** (`Ctrl+E`) to save the currently visible messages (respecting any active filter) as a CSV file.
 
+### Publisher filter
+
+Click a topic in the **Publishers** panel (left side) to filter messages by that specific topic. The panel shows message counts per publisher. Click **Show All** or clear the selection to restore all messages.
+
 ### Keyboard shortcuts
 
 | Shortcut | Action |
@@ -151,9 +143,13 @@ Go to **File → Export to CSV…** (`Ctrl+E`) to save the currently visible mes
 | `Ctrl+E` | Export to CSV |
 | `Ctrl+Q` | Quit |
 
-### About
+### Auto-scroll
 
-Go to **About → About MQTT Monitor…** to view the application version, author, licence, and the exact installed versions of all runtime dependencies.
+Enable the **⬇ Auto-scroll** checkbox in the toolbar to automatically scroll to new messages as they arrive.
+
+## About
+
+Click **About → About MQTT Monitor…** to view app version, dependencies, and license information.
 
 ## Author
 
